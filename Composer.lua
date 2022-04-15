@@ -18,6 +18,7 @@ type Extension = {
 type Extensions = { { Extension }? }
 
 local IS_SERVER = RunService:IsServer()
+local DEFAULT_TIMEOUT = 60
 
 local Symbol = require(script.Parent.Parent.Symbol)
 local Promise = require(script.Parent.Parent.Promise)
@@ -34,6 +35,8 @@ local KEY_STARTED = Symbol("Started")
 
 local KEY_COMPOSITION = Symbol("Composition")
 local KEY_COMPOSERS = Symbol("Composers")
+
+local KEY_INST_TO_COMPOSITION = Symbol("InstanceToComposition")
 
 local renderId = 0
 local function NextRenderName(): string
@@ -92,6 +95,8 @@ function Composer.new(extensions: Extensions): table
 	customComposer[KEY_CONSTRUCTED] = {}
 	customComposer[KEY_STARTED] = {}
 
+	customComposer[KEY_INST_TO_COMPOSITION] = {}
+
 	customComposer.Constructed = customComposer[KEY_TROVE]:Construct(Signal)
 
 	setmetatable(customComposer, Composer)
@@ -101,6 +106,9 @@ end
 function Composer:_instansiate(composition, index: string, composers: table?)
 	local composer = setmetatable({}, self)
 
+	self[KEY_INST_TO_COMPOSITION][composition.Instance] = composer
+
+	-- Should key composition perhaps be the parent composition instead?
 	composer[KEY_COMPOSITION] = composition
 	composer[KEY_COMPOSERS] = {}
 
@@ -128,7 +136,7 @@ function Composer:_construct(): table
 		return nil
 	end
 
-	self[KEY_CONSTRUCTED][self.Instance] = Promise.defer(function(resolve)
+	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]] = Promise.defer(function(resolve)
 		InvokeExtensionFn(self, "Constructing")
 		self:Construct()
 		InvokeExtensionFn(self, "Constructed")
@@ -146,14 +154,14 @@ function Composer:_construct(): table
 		self.Constructed:Fire(self)
 	end)
 
-	self[KEY_CONSTRUCTED][self.Instance]:catch(warn)
+	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]:catch(warn)
 
-	return self[KEY_CONSTRUCTED][self.Instance]
+	return self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]
 end
 
 function Composer:_start(): table
-	self[KEY_STARTED][self.Instance] = Promise.new(function(resolve, reject)
-		local status = self[KEY_CONSTRUCTED][self.Instance]:await()
+	self[KEY_STARTED][self[KEY_COMPOSITION]] = Promise.new(function(resolve, reject)
+		local status = self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]:await()
 
 		if not status then
 			reject()
@@ -203,13 +211,13 @@ function Composer:_start(): table
 		end):andThen(resolve):catch(reject)
 	end)
 
-	self[KEY_STARTED][self.Instance]:catch(warn)
+	self[KEY_STARTED][self[KEY_COMPOSITION]]:catch(warn)
 
-	return self[KEY_STARTED][self.Instance]
+	return self[KEY_STARTED][self[KEY_COMPOSITION]]
 end
 
 function Composer:_stop()
-	self[KEY_STARTED][self.Instance]
+	self[KEY_STARTED][self[KEY_COMPOSITION]]
 		:finally(function()
 			if self._heartbeatUpdate then
 				self._heartbeatUpdate:Disconnect()
@@ -232,17 +240,64 @@ function Composer:_stop()
 		end)
 		:catch(warn)
 
-	self[KEY_CONSTRUCTED][self.Instance] = nil
-	self[KEY_STARTED][self.Instance] = nil
+	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]] = nil
+	self[KEY_STARTED][self[KEY_COMPOSITION]] = nil
 end
 
 function Composer:_getConstructed(): table?
-	return self[KEY_CONSTRUCTED][self.Instance]
+	return self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]
 end
 
 function Composer:_getStarted(): table?
-	return self[KEY_STARTED][self.Instance]
+	return self[KEY_STARTED][self[KEY_COMPOSITION]]
 end
+
+function Composer:FromInstance(instance: Instance): table?
+	local composer = self[KEY_INST_TO_COMPOSITION][instance]
+
+	if not composer then
+		return
+	end
+
+	local composition = composer[KEY_COMPOSITION]
+
+	local promise = self[KEY_CONSTRUCTED][composition]
+
+	if not promise then
+		return
+	end
+
+	if not promise:getStatus() == Promise.Status.Resolved then
+		return
+	end
+
+	return composer
+end
+
+function Composer:GetComposer(composer: table): table?
+	return composer:FromInstance(self.Instance)
+end
+
+function Composer:WaitForInstance(instance: Instance, timeout: number?): table
+	local composer = self:FromInstance(instance)
+	if composer then
+		return Promise.resolve(composer)
+	end
+
+	return Promise.fromEvent(self.Constructed, function(c)
+		local match = c.Instance == instance
+		if match then
+			composer = c
+		end
+		return match
+	end)
+		:andThen(function()
+			return composer
+		end)
+		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
+end
+
+function Composer:GetAll() end
 
 function Composer:Construct() end
 

@@ -9,12 +9,10 @@ type CompositionConfig = { Tag: string, Composition: Composition, Ancestors: Anc
 local CollectionService = game:GetService("CollectionService")
 
 local DEFAULT_ANCESTORS = { workspace, game:GetService("Players") }
-local DEFAULT_TIMEOUT = 60
 
 local Trove = require(script.Parent.Trove)
 local Symbol = require(script.Parent.Symbol)
 local Signal = require(script.Parent.Signal)
-local Promise = require(script.Parent.Promise)
 
 local KEY_ANCESTORS = Symbol("Ancestors")
 local KEY_TROVE = Symbol("Trove")
@@ -162,70 +160,5 @@ function Composition:_stop()
 		end
 	end
 end
-
-function Composition:FromInstance(instance: Instance): table
-	return self[KEY_COMPOSITIONS][instance]
-end
-
-function Composition:WaitForInstance(instance: Instance, timeout: number?): table
-	local composition = self:FromInstance(instance)
-	if composition then
-		return Promise.resolve(composition)
-	end
-
-	return Promise.fromEvent(self.Constructed, function(c)
-		local match = c.Instance == instance
-		if match then
-			composition = c
-		end
-		return match
-	end)
-		:andThen(function()
-			return composition
-		end)
-		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
-end
-
-function Composition:GetComposer(index: string): table
-	local composer = self[KEY_COMPOSERS][index]
-
-	local promise = composer:_getConstructed()
-	if not promise then
-		return
-	end
-
-	if promise:getStatus() ~= Promise.Status.Resolved then
-		return
-	end
-
-	return composer
-end
-
-function Composition:WaitForComposer(index: string, timeout: number?): table
-	local composer = self:GetComposer(index)
-	if composer then
-		return Promise.resolve(composer)
-	end
-
-	composer = self[KEY_COMPOSERS][index]
-
-	return Promise.fromEvent(composer.Constructed, function(c)
-		local match = c == composer
-		if match then
-			composer = c
-		end
-		return match
-	end)
-		:andThen(function()
-			return composer
-		end)
-		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
-end
-
---[[
-    -- Introduce this?
-function Composition:WaitForComposer()
-end
---]]
 
 return Composition
