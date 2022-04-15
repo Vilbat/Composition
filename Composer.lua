@@ -267,7 +267,7 @@ function Composer:FromInstance(instance: Instance): table?
 		return
 	end
 
-	if not promise:getStatus() == Promise.Status.Resolved then
+	if promise:getStatus() ~= Promise.Status.Resolved then
 		return
 	end
 
