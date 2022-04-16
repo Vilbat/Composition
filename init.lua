@@ -143,12 +143,6 @@ end
 
 function Composition:_start()
 	for _, composer in pairs(self[KEY_COMPOSERS]) do
-		if not composer:_getConstructed() then
-			continue
-		end
-		if composer:_getStarted() then
-			continue
-		end
 		composer:_start()
 	end
 end

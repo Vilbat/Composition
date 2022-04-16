@@ -98,6 +98,7 @@ function Composer.new(extensions: Extensions): table
 	customComposer[KEY_INST_TO_COMPOSITION] = {}
 
 	customComposer.Constructed = customComposer[KEY_TROVE]:Construct(Signal)
+	customComposer.Stopped = customComposer[KEY_TROVE]:Construct(Signal)
 
 	setmetatable(customComposer, Composer)
 	return customComposer
@@ -160,6 +161,13 @@ function Composer:_construct(): table
 end
 
 function Composer:_start(): table
+	if not self:_getConstructed() then
+		return
+	end
+	if self:_getStarted() then
+		return
+	end
+
 	self[KEY_STARTED][self[KEY_COMPOSITION]] = Promise.new(function(resolve, reject)
 		local status = self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]:await()
 
@@ -237,6 +245,8 @@ function Composer:_stop()
 			for _, composer in pairs(self[KEY_COMPOSERS]) do
 				composer:_stop() -- Make this async?
 			end
+
+			self.Stopped:Fire()
 		end)
 		:catch(warn)
 
