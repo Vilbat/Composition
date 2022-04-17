@@ -149,9 +149,7 @@ end
 
 function Composition:_stop()
 	for _, composer in pairs(self[KEY_COMPOSERS]) do
-		if composer:_getConstructed() then
-			composer:_stop()
-		end
+		composer:_stop()
 	end
 end
 

@@ -92,8 +92,8 @@ function Composer.new(extensions: Extensions): table
 
 	customComposer[KEY_EXTENSIONS] = extensions or {}
 
-	customComposer[KEY_CONSTRUCTED] = {}
-	customComposer[KEY_STARTED] = {}
+	--customComposer[KEY_CONSTRUCTED] = {}
+	--customComposer[KEY_STARTED] = {}
 
 	customComposer[KEY_INST_TO_COMPOSITION] = {}
 
@@ -137,7 +137,7 @@ function Composer:_construct(): table
 		return nil
 	end
 
-	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]] = Promise.defer(function(resolve)
+	self[KEY_CONSTRUCTED] = Promise.defer(function(resolve)
 		InvokeExtensionFn(self, "Constructing")
 		self:Construct()
 		InvokeExtensionFn(self, "Constructed")
@@ -155,9 +155,9 @@ function Composer:_construct(): table
 		self.Constructed:Fire(self)
 	end)
 
-	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]:catch(warn)
+	self[KEY_CONSTRUCTED]:catch(warn)
 
-	return self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]
+	return self[KEY_CONSTRUCTED]
 end
 
 function Composer:_start(): table
@@ -168,8 +168,8 @@ function Composer:_start(): table
 		return
 	end
 
-	self[KEY_STARTED][self[KEY_COMPOSITION]] = Promise.new(function(resolve, reject)
-		local status = self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]:await()
+	self[KEY_STARTED] = Promise.new(function(resolve, reject)
+		local status = self[KEY_CONSTRUCTED]:await()
 
 		if not status then
 			reject()
@@ -219,13 +219,17 @@ function Composer:_start(): table
 		end):andThen(resolve):catch(reject)
 	end)
 
-	self[KEY_STARTED][self[KEY_COMPOSITION]]:catch(warn)
+	self[KEY_STARTED]:catch(warn)
 
-	return self[KEY_STARTED][self[KEY_COMPOSITION]]
+	return self[KEY_STARTED]
 end
 
 function Composer:_stop()
-	self[KEY_STARTED][self[KEY_COMPOSITION]]
+	if not self:_getConstructed() then
+		return
+	end
+
+	self[KEY_STARTED]
 		:finally(function()
 			if self._heartbeatUpdate then
 				self._heartbeatUpdate:Disconnect()
@@ -250,16 +254,16 @@ function Composer:_stop()
 		end)
 		:catch(warn)
 
-	self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]] = nil
-	self[KEY_STARTED][self[KEY_COMPOSITION]] = nil
+	self[KEY_CONSTRUCTED] = nil
+	self[KEY_STARTED] = nil
 end
 
 function Composer:_getConstructed(): table?
-	return self[KEY_CONSTRUCTED][self[KEY_COMPOSITION]]
+	return self[KEY_CONSTRUCTED]
 end
 
 function Composer:_getStarted(): table?
-	return self[KEY_STARTED][self[KEY_COMPOSITION]]
+	return self[KEY_STARTED]
 end
 
 function Composer:FromInstance(instance: Instance): table?
@@ -269,9 +273,10 @@ function Composer:FromInstance(instance: Instance): table?
 		return
 	end
 
-	local composition = composer[KEY_COMPOSITION]
+	--local composition = composer[KEY_COMPOSITION]
 
-	local promise = self[KEY_CONSTRUCTED][composition]
+	--local promise = self[KEY_CONSTRUCTED][composition]
+	local promise = composer[KEY_CONSTRUCTED]
 
 	if not promise then
 		return
