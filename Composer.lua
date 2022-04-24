@@ -176,10 +176,20 @@ function Composer:_start(): table
 			return
 		end
 
-		Promise.defer(function(_resolve)
+		task.defer(function()
+		--Promise.defer(function(_resolve)
 			InvokeExtensionFn(self, "Starting")
 			self:Start()
 			InvokeExtensionFn(self, "Started")
+
+			local promises = {}
+
+			for _, composition in pairs(self[KEY_COMPOSERS]) do
+				local promise = composition:_start()
+				table.insert(promises, promise)
+			end
+
+			Promise.allSettled(promises):await()
 
 			local hasHeartbeatUpdate = typeof(self.HeartbeatUpdate) == "function"
 			local hasSteppedUpdate = typeof(self.SteppedUpdate) == "function"
@@ -207,16 +217,10 @@ function Composer:_start(): table
 				end
 			end
 
-			local promises = {}
-
-			for _, composition in pairs(self[KEY_COMPOSERS]) do
-				local promise = composition:_start()
-				table.insert(promises, promise)
-			end
-
-			Promise.allSettled(promises):await()
-			_resolve()
-		end):andThen(resolve):catch(reject)
+			--_resolve()
+		--end):andThen(resolve):catch(reject)
+			resolve()
+		end)
 	end)
 
 	self[KEY_STARTED]:catch(warn)
