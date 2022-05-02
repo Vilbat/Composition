@@ -98,7 +98,7 @@ function Composer.new(extensions: Extensions): table
 	customComposer[KEY_INST_TO_COMPOSITION] = {}
 
 	customComposer.Constructed = customComposer[KEY_TROVE]:Construct(Signal)
-	customComposer.Stopped = customComposer[KEY_TROVE]:Construct(Signal)
+	--customComposer.Stopped = customComposer[KEY_TROVE]:Construct(Signal)
 
 	setmetatable(customComposer, Composer)
 	return customComposer
@@ -114,6 +114,7 @@ function Composer:_instansiate(composition, index: string, composers: table?)
 	composer[KEY_COMPOSERS] = {}
 
 	composer.Instance = composition.Instance
+	composer.Stopped = Signal.new()
 
 	composers = composers or {}
 
@@ -177,7 +178,7 @@ function Composer:_start(): table
 		end
 
 		task.defer(function()
-		--Promise.defer(function(_resolve)
+			--Promise.defer(function(_resolve)
 			InvokeExtensionFn(self, "Starting")
 			self:Start()
 			InvokeExtensionFn(self, "Started")
@@ -218,7 +219,7 @@ function Composer:_start(): table
 			end
 
 			--_resolve()
-		--end):andThen(resolve):catch(reject)
+			--end):andThen(resolve):catch(reject)
 			resolve()
 		end)
 	end)
@@ -255,6 +256,7 @@ function Composer:_stop()
 			end
 
 			self.Stopped:Fire()
+			self.Stopped:Destroy()
 		end)
 		:catch(warn)
 
@@ -277,9 +279,6 @@ function Composer:FromInstance(instance: Instance): table?
 		return
 	end
 
-	--local composition = composer[KEY_COMPOSITION]
-
-	--local promise = self[KEY_CONSTRUCTED][composition]
 	local promise = composer[KEY_CONSTRUCTED]
 
 	if not promise then
