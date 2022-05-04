@@ -92,13 +92,9 @@ function Composer.new(extensions: Extensions): table
 
 	customComposer[KEY_EXTENSIONS] = extensions or {}
 
-	--customComposer[KEY_CONSTRUCTED] = {}
-	--customComposer[KEY_STARTED] = {}
-
 	customComposer[KEY_INST_TO_COMPOSITION] = {}
 
 	customComposer.Constructed = customComposer[KEY_TROVE]:Construct(Signal)
-	--customComposer.Stopped = customComposer[KEY_TROVE]:Construct(Signal)
 
 	setmetatable(customComposer, Composer)
 	return customComposer
@@ -315,7 +311,17 @@ function Composer:WaitForInstance(instance: Instance, timeout: number?): table
 		:timeout(if type(timeout) == "number" then timeout else DEFAULT_TIMEOUT)
 end
 
-function Composer:GetAll() end
+function Composer:GetAll(): table
+	local composers = {}
+
+	for instance, composer in pairs(self[KEY_INST_TO_COMPOSITION]) do
+		if self:FromInstance(instance) then
+			table.insert(composers, composer)
+		end
+	end
+
+	return composers
+end
 
 function Composer:Construct() end
 
