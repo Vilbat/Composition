@@ -4,7 +4,15 @@ type Composition = { string: table }
 
 type AncestorList = { Instance }
 
-type CompositionConfig = { Tag: string, Composition: Composition, Ancestors: AncestorList }
+type ExtensionShouldFn = (any) -> boolean
+
+type Extension = {
+	ShouldConstruct: ExtensionShouldFn?,
+}
+
+type Extensions = { { Extension }? }
+
+type CompositionConfig = { Tag: string, Composition: Composition, Ancestors: AncestorList, Extensions: Extensions }
 
 local CollectionService = game:GetService("CollectionService")
 
@@ -15,12 +23,26 @@ local Symbol = require(script.Parent.Symbol)
 local Signal = require(script.Parent.Signal)
 
 local KEY_ANCESTORS = Symbol("Ancestors")
+local KEY_EXTENSIONS = Symbol("Extensions")
 local KEY_TROVE = Symbol("Trove")
 local KEY_COMPOSITION = Symbol("Composition")
 
 local KEY_COMPOSITIONS = Symbol("Compositions")
 
 local KEY_COMPOSERS = Symbol("Composers")
+
+local function ShouldConstruct(self): boolean
+	for _, extension in ipairs(self[KEY_EXTENSIONS]) do
+		local fn = extension.ShouldConstruct
+		if type(fn) == "function" then
+			local shouldConstruct = fn(self)
+			if not shouldConstruct then
+				return false
+			end
+		end
+	end
+	return true
+end
 
 local Composition = {}
 Composition.__index = Composition
@@ -37,6 +59,7 @@ function Composition.new(config: CompositionConfig): table
 
 	customComposition[KEY_COMPOSITION] = config.Composition or {}
 	customComposition[KEY_ANCESTORS] = config.Ancestors or DEFAULT_ANCESTORS
+	customComposition[KEY_EXTENSIONS] = config.Extensions or {}
 
 	customComposition[KEY_COMPOSITIONS] = {}
 
@@ -57,7 +80,13 @@ function Composition:_setup()
 			return
 		end
 
-		self[KEY_COMPOSITIONS][instance] = self:_instansiate(instance)
+		local composition = self:_instansiate(instance)
+
+		if not ShouldConstruct(composition) then
+			return
+		end
+
+		self[KEY_COMPOSITIONS][instance] = composition
 		self[KEY_COMPOSITIONS][instance]:_construct()
 		self[KEY_COMPOSITIONS][instance]:_start()
 
