@@ -84,7 +84,7 @@ end
 local Composer = {}
 Composer.__index = Composer
 
-function Composer.new(extensions: Extensions): table
+function Composer.new(extensions: Extensions)
 	local customComposer = {}
 	customComposer.__index = customComposer
 
@@ -100,172 +100,127 @@ function Composer.new(extensions: Extensions): table
 	return customComposer
 end
 
-function Composer:_instansiate(composition, index: string, composers: table?)
+function Composer:_instansiate(composition)
 	local composer = setmetatable({}, self)
 
 	self[KEY_INST_TO_COMPOSITION][composition.Instance] = composer
 
-	-- Should key composition perhaps be the parent composition instead?
 	composer[KEY_COMPOSITION] = composition
-	composer[KEY_COMPOSERS] = {}
 
 	composer.Instance = composition.Instance
 	composer.Stopped = Signal.new()
 
-	composers = composers or {}
-
-	for _index, _composer in pairs(composers) do
-		local handle = _composer.Handle
-		_composer = handle:_instansiate(composition, _index, _composer.Composers)
-
-		composer[KEY_COMPOSERS][_index] = _composer
-		composer[_index] = _composer
-
-		_composer[index] = composer
-	end
-
 	return composer
 end
 
-function Composer:_construct(): table
+function Composer:_construct()
+	--if self:_getConstructed() then
+	--return
+	--end
+
 	self[KEY_ACTIVE_EXTENSIONS] = GetActiveExtensions(self, self[KEY_EXTENSIONS])
 
+	-- should construct always should be async
 	if not ShouldConstruct(self) then
 		return nil
 	end
 
-	self[KEY_CONSTRUCTED] = Promise.defer(function(resolve)
+	self[KEY_CONSTRUCTED] = Promise.new(function() end)
+	local resolve = function()
+		self[KEY_CONSTRUCTED]:_resolve()
+
+		self.Constructed:Fire(self)
+	end
+
+	return Promise.defer(function(_resolve)
 		InvokeExtensionFn(self, "Constructing")
 		self:Construct()
 		InvokeExtensionFn(self, "Constructed")
 
-		local promises = {}
-		for _, composer in pairs(self[KEY_COMPOSERS]) do
-			local promise = composer:_construct()
-			table.insert(promises, promise)
-		end
+		--return resolve
+		_resolve(resolve)
+	end)
+end
 
-		Promise.allSettled(promises):await()
+function Composer:_start()
+	--if self:_getStarted() then
+	--return
+	--end
+
+	return Promise.defer(function(resolve)
+		InvokeExtensionFn(self, "Starting")
+		self:Start()
+		InvokeExtensionFn(self, "Started")
+
+		--local promises = {}
+
+		--for _, composition in pairs(self[KEY_COMPOSERS]) do
+		--local promise = composition:_start()
+		--table.insert(promises, promise)
+		--end
+
+		--Promise.allSettled(promises):await()
+
+		local hasHeartbeatUpdate = typeof(self.HeartbeatUpdate) == "function"
+		local hasSteppedUpdate = typeof(self.SteppedUpdate) == "function"
+		local hasRenderSteppedUpdate = typeof(self.RenderSteppedUpdate) == "function"
+		if hasHeartbeatUpdate then
+			self._heartbeatUpdate = RunService.Heartbeat:Connect(function(dt)
+				self:HeartbeatUpdate(dt)
+			end)
+		end
+		if hasSteppedUpdate then
+			self._steppedUpdate = RunService.Stepped:Connect(function(_, dt)
+				self:SteppedUpdate(dt)
+			end)
+		end
+		if hasRenderSteppedUpdate and not IS_SERVER then
+			if self.RenderPriority then
+				self._renderName = NextRenderName()
+				RunService:BindToRenderStep(self._renderName, self.RenderPriority, function(dt)
+					self:RenderSteppedUpdate(dt)
+				end)
+			else
+				self._renderSteppedUpdate = RunService.RenderStepped:Connect(function(dt)
+					self:RenderSteppedUpdate(dt)
+				end)
+			end
+		end
 
 		resolve()
-
-		self.Constructed:Fire(self)
 	end)
-
-	self[KEY_CONSTRUCTED]:catch(warn)
-
-	return self[KEY_CONSTRUCTED]
 end
 
-function Composer:_start(): table
-	if not self:_getConstructed() then
-		return
-	end
-	if self:_getStarted() then
-		return
-	end
-
-	self[KEY_STARTED] = Promise.new(function(resolve, reject)
-		local status = self[KEY_CONSTRUCTED]:await()
-
-		if not status then
-			reject()
-			return
-		end
-
-		task.defer(function()
-			--Promise.defer(function(_resolve)
-			InvokeExtensionFn(self, "Starting")
-			self:Start()
-			InvokeExtensionFn(self, "Started")
-
-			local promises = {}
-
-			for _, composition in pairs(self[KEY_COMPOSERS]) do
-				local promise = composition:_start()
-				table.insert(promises, promise)
-			end
-
-			Promise.allSettled(promises):await()
-
-			local hasHeartbeatUpdate = typeof(self.HeartbeatUpdate) == "function"
-			local hasSteppedUpdate = typeof(self.SteppedUpdate) == "function"
-			local hasRenderSteppedUpdate = typeof(self.RenderSteppedUpdate) == "function"
-			if hasHeartbeatUpdate then
-				self._heartbeatUpdate = RunService.Heartbeat:Connect(function(dt)
-					self:HeartbeatUpdate(dt)
-				end)
-			end
-			if hasSteppedUpdate then
-				self._steppedUpdate = RunService.Stepped:Connect(function(_, dt)
-					self:SteppedUpdate(dt)
-				end)
-			end
-			if hasRenderSteppedUpdate and not IS_SERVER then
-				if self.RenderPriority then
-					self._renderName = NextRenderName()
-					RunService:BindToRenderStep(self._renderName, self.RenderPriority, function(dt)
-						self:RenderSteppedUpdate(dt)
-					end)
-				else
-					self._renderSteppedUpdate = RunService.RenderStepped:Connect(function(dt)
-						self:RenderSteppedUpdate(dt)
-					end)
-				end
-			end
-
-			--_resolve()
-			--end):andThen(resolve):catch(reject)
-			resolve()
-		end)
-	end)
-
-	self[KEY_STARTED]:catch(warn)
-
-	return self[KEY_STARTED]
-end
-
-function Composer:_stop()
-	if not self:_getConstructed() then
-		return
-	end
-
-	self[KEY_STARTED]
-		:finally(function()
-			if self._heartbeatUpdate then
-				self._heartbeatUpdate:Disconnect()
-			end
-			if self._steppedUpdate then
-				self._steppedUpdate:Disconnect()
-			end
-
-			if self._renderSteppedUpdate then
-				self._renderSteppedUpdate:Disconnect()
-			elseif self._renderName then
-				RunService:UnbindFromRenderStep(self._renderName)
-			end
-
-			self:Stop()
-
-			for _, composer in pairs(self[KEY_COMPOSERS]) do
-				composer:_stop() -- Make this async?
-			end
-
-			self.Stopped:Fire()
-			self.Stopped:Destroy()
-		end)
-		:catch(warn)
-
-	self[KEY_CONSTRUCTED] = nil
-	self[KEY_STARTED] = nil
-end
-
+--[[
 function Composer:_getConstructed(): table?
 	return self[KEY_CONSTRUCTED]
 end
 
 function Composer:_getStarted(): table?
 	return self[KEY_STARTED]
+end
+]]
+
+function Composer:_stop()
+	task.spawn(function()
+		if self._heartbeatUpdate then
+			self._heartbeatUpdate:Disconnect()
+		end
+		if self._steppedUpdate then
+			self._steppedUpdate:Disconnect()
+		end
+
+		if self._renderSteppedUpdate then
+			self._renderSteppedUpdate:Disconnect()
+		elseif self._renderName then
+			RunService:UnbindFromRenderStep(self._renderName)
+		end
+
+		self:Stop()
+
+		self.Stopped:Fire()
+		self.Stopped:Destroy()
+	end)
 end
 
 function Composer:FromInstance(instance: Instance): table?

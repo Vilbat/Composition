@@ -1,6 +1,6 @@
 [package]
 name = "vilbat/composition"
-version = "0.2.0"
+version = "0.2.1"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 
@@ -9,4 +9,4 @@ Signal = "sleitnick/signal@1.1.0"
 Trove = "sleitnick/trove@0.4.0"
 Promise = "evaera/promise@4.0.0"
 Symbol = "sleitnick/symbol@2.0.0"
-TableUtil = "sleitnick/table-util@1.1.1"
+TableUtil = "sleitnick/table-util@1.1.4"

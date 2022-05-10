@@ -19,7 +19,7 @@ dependencies = []
 
 [[package]]
 name = "sleitnick/table-util"
-version = "1.1.2"
+version = "1.1.4"
 dependencies = []
 
 [[package]]
@@ -28,6 +28,6 @@ version = "0.4.0"
 dependencies = []
 
 [[package]]
-name = "vilme/composition"
-version = "0.1.0"
-dependencies = [["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@1.1.0"], ["Symbol", "sleitnick/symbol@2.0.0"], ["TableUtil", "sleitnick/table-util@1.1.2"], ["Trove", "sleitnick/trove@0.4.0"]]
+name = "vilbat/composition"
+version = "0.2.0"
+dependencies = [["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@1.1.0"], ["Symbol", "sleitnick/symbol@2.0.0"], ["TableUtil", "sleitnick/table-util@1.1.4"], ["Trove", "sleitnick/trove@0.4.0"]]
