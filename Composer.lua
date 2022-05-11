@@ -114,10 +114,6 @@ function Composer:_instansiate(composition)
 end
 
 function Composer:_construct()
-	--if self:_getConstructed() then
-	--return
-	--end
-
 	self[KEY_ACTIVE_EXTENSIONS] = GetActiveExtensions(self, self[KEY_EXTENSIONS])
 
 	-- should construct always should be async
@@ -146,6 +142,9 @@ function Composer:_start()
 	--if self:_getStarted() then
 	--return
 	--end
+	if not self[KEY_CONSTRUCTED] then
+		return
+	end
 
 	return Promise.defer(function(resolve)
 		InvokeExtensionFn(self, "Starting")
@@ -191,17 +190,11 @@ function Composer:_start()
 	end)
 end
 
---[[
-function Composer:_getConstructed(): table?
-	return self[KEY_CONSTRUCTED]
-end
-
-function Composer:_getStarted(): table?
-	return self[KEY_STARTED]
-end
-]]
-
 function Composer:_stop()
+	if not self[KEY_CONSTRUCTED] then
+		return
+	end
+
 	task.spawn(function()
 		if self._heartbeatUpdate then
 			self._heartbeatUpdate:Disconnect()

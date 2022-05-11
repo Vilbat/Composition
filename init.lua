@@ -110,7 +110,7 @@ function Composition:_setup()
 		end
 
 		--for _, composition in ipairs(compositions) do
-			--composition:_stop()
+		--composition:_stop()
 		--end
 		if composition[KEY_ANCESTOR] == instance.Parent then
 			return
@@ -131,12 +131,9 @@ function Composition:_setup()
 		end
 
 		watchingInstances[instance] = instance.AncestryChanged:Connect(function(_, parent)
-			--print("ancestry changed")
-			--print(instance:GetFullName())
 			TryDeconstructInstance(instance)
 
 			if parent and IsInAncestorList() then
-				--print("in ancestor list")
 				TryConstructInstance(instance)
 			end
 		end)
@@ -147,18 +144,6 @@ function Composition:_setup()
 	end
 
 	local function InstanceUntagged(instance: Instance)
-		--TryDeconstructInstance(instance)
-
-		--[[
-		local compositions = instanceCompositions[instance]
-		if compositions then
-			for _, composition in ipairs(compositions) do
-				composition:_stop()
-			end
-
-			instanceCompositions[instance] = nil
-		end
-		]]
 		local composition = instanceCompositions[instance]
 		if composition then
 			composition:_stop()
@@ -254,8 +239,12 @@ function Composition:_construct()
 			composers = lowerComposers
 		end
 
-		for _, resolve in ipairs(resolves) do
-			resolve()
+		for _, output in ipairs(resolves) do
+			if typeof(output) == "function" then
+				output()
+			else
+				warn(output)
+			end
 		end
 	end)
 
@@ -285,7 +274,13 @@ function Composition:_start()
 				end
 			end
 
-			Promise.all(promises):await()
+			local status, errors = Promise.all(promises):await()
+
+			if not status then
+				for _, error in pairs(errors) do
+					warn(error)
+				end
+			end
 
 			composers = lowerComposers
 		end
