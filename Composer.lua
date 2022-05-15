@@ -110,6 +110,8 @@ function Composer:_instansiate(composition)
 	composer.Instance = composition.Instance
 	composer.Stopped = Signal.new()
 
+	composer.IsStopped = false
+
 	return composer
 end
 
@@ -139,9 +141,6 @@ function Composer:_construct()
 end
 
 function Composer:_start()
-	--if self:_getStarted() then
-	--return
-	--end
 	if not self[KEY_CONSTRUCTED] then
 		return
 	end
@@ -150,15 +149,6 @@ function Composer:_start()
 		InvokeExtensionFn(self, "Starting")
 		self:Start()
 		InvokeExtensionFn(self, "Started")
-
-		--local promises = {}
-
-		--for _, composition in pairs(self[KEY_COMPOSERS]) do
-		--local promise = composition:_start()
-		--table.insert(promises, promise)
-		--end
-
-		--Promise.allSettled(promises):await()
 
 		local hasHeartbeatUpdate = typeof(self.HeartbeatUpdate) == "function"
 		local hasSteppedUpdate = typeof(self.SteppedUpdate) == "function"
@@ -213,6 +203,8 @@ function Composer:_stop()
 
 		self.Stopped:Fire()
 		self.Stopped:Destroy()
+
+		self.IsStopped = true
 	end)
 end
 
